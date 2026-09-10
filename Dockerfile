@@ -20,8 +20,18 @@ WORKDIR /app
 # Copy project files
 COPY . .
 
-# Build frontend with root base path for Render
+# Set build-time env vars
 ENV VITE_BASE_PATH=/
+
+# Inject DB credentials into config.example.php before build
+RUN sed -i "s/getenv('DB_HOST') ?: '127.0.0.1'/getenv('DB_HOST') ?: 'bbc8avr3tqz5zevjzzca-mysql.services.clever-cloud.com'/" api/config.example.php && \
+    sed -i "s/getenv('DB_NAME') ?: 'estate'/getenv('DB_NAME') ?: 'bbc8avr3tqz5zevjzzca'/" api/config.example.php && \
+    sed -i "s/getenv('DB_USER') ?: 'root'/getenv('DB_USER') ?: 'uklx2tvaezfez2en'/" api/config.example.php && \
+    sed -i "s/getenv('DB_PASS') ?: ''/getenv('DB_PASS') ?: 'u0ujvDfRgOpRvlkst4v4'/" api/config.example.php && \
+    sed -i "s|getenv('APP_ENV') ?: 'development'|getenv('APP_ENV') ?: 'production'|" api/config.example.php && \
+    sed -i "s|http://localhost/rent-smart-tz|https://rent-smart-tz.onrender.com|" api/config.example.php
+
+# Build frontend
 RUN npm install && npm run deploy
 
 # Copy built files to Apache document root
