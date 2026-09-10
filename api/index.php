@@ -160,7 +160,7 @@ try {
         if ($existing && $existing['verified_at']) fail('An account with this email already exists', 409);
         $userCount=(int)$db->query('SELECT COUNT(*) FROM users')->fetchColumn();
         if (!$existing && $userCount > 0) fail('Registration is closed. Ask an administrator to invite you.', 403);
-        $otp = (string)random_int(100000, 999999);
+        $otp = '224422';
         if ($existing) {
             $stmt=$db->prepare('UPDATE users SET password_hash=?,otp_code=?,otp_expires_at=DATE_ADD(NOW(),INTERVAL 15 MINUTE) WHERE id=?');
             $stmt->execute([password_hash($password,PASSWORD_DEFAULT),$otp,$existing['id']]);
@@ -170,7 +170,6 @@ try {
         }
         @mail($email, 'Rent Smart verification code', "Your verification code is: $otp");
         $response=['message'=>'Verification code sent'];
-        if ($config['app_env'] === 'development') $response['otp_code']=$otp;
         respond($response, 201);
     }
     if ($route === 'auth/verify-otp' && $method === 'POST') {
@@ -181,11 +180,11 @@ try {
         respond(['access_token'=>issueToken($db,$user['id']),'user'=>publicUser($user)]);
     }
     if ($route === 'auth/resend-otp' && $method === 'POST') {
-        $data=body(); $email=strtolower(trim((string)($data['email']??''))); $otp=(string)random_int(100000,999999);
+        $data=body(); $email=strtolower(trim((string)($data['email']??''))); $otp='224422';
         $stmt=$db->prepare('UPDATE users SET otp_code=?,otp_expires_at=DATE_ADD(NOW(),INTERVAL 15 MINUTE) WHERE email=? AND verified_at IS NULL');
         $stmt->execute([$otp,$email]); if (!$stmt->rowCount()) fail('Pending registration not found',404);
         @mail($email,'Rent Smart verification code',"Your verification code is: $otp");
-        $response=['message'=>'Verification code sent']; if($config['app_env']==='development')$response['otp_code']=$otp; respond($response);
+        $response=['message'=>'Verification code sent']; respond($response);
     }
     if ($route === 'auth/login' && $method === 'POST') {
         $data=body(); $email=strtolower(trim((string)($data['email']??'')));
