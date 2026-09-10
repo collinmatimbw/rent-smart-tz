@@ -1,8 +1,3 @@
 node_modules/
 .git/
-src/
-database/
 .agents/
-scripts/
-*.md
-deploy/database/
