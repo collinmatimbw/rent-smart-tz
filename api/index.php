@@ -363,7 +363,10 @@ try {
         }
         if($method==='POST' && $action==='delete-many'){
             requireAdmin($user);$payload=body();$params=[];$where=whereClause($payload,$fields,$params);
-            $stmt=$db->prepare('DELETE FROM '.quoted($table).$where);$stmt->execute($params);respond(['deleted'=>$stmt->rowCount()]);
+            $db->exec('SET FOREIGN_KEY_CHECKS=0');
+            $stmt=$db->prepare('DELETE FROM '.quoted($table).$where);$stmt->execute($params);
+            $db->exec('SET FOREIGN_KEY_CHECKS=1');
+            respond(['deleted'=>$stmt->rowCount()]);
         }
         if($method==='POST' && $action==='bulk'){
             $items=body();if(!array_is_list($items))fail('Expected an array');
@@ -387,7 +390,10 @@ try {
             $stmt=$db->prepare('SELECT * FROM '.quoted($table).' WHERE id=?');$stmt->execute([$id]);$row=$stmt->fetch();if(!$row)fail('Record not found',404);$row=castRows([$row],$meta['numeric'])[0]; if($entity==='User')$row=publicUser($row); respond($row);
         }
         if($method==='DELETE' && $action==='delete' && $id){
-            $stmt=$db->prepare('DELETE FROM '.quoted($table).' WHERE id=?');$stmt->execute([$id]);respond(['deleted'=>$stmt->rowCount()]);
+            $db->exec('SET FOREIGN_KEY_CHECKS=0');
+            $stmt=$db->prepare('DELETE FROM '.quoted($table).' WHERE id=?');$stmt->execute([$id]);
+            $db->exec('SET FOREIGN_KEY_CHECKS=1');
+            respond(['deleted'=>$stmt->rowCount()]);
         }
     }
     fail('Route not found',404);
