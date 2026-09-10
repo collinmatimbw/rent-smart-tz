@@ -19,7 +19,8 @@ WORKDIR /app
 # Copy project files
 COPY . .
 
-# Build frontend
+# Build frontend with root base path for Render
+ENV VITE_BASE_PATH=/
 RUN npm install && npm run deploy
 
 # Copy built files to Apache document root
