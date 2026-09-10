@@ -1,0 +1,107 @@
+CREATE DATABASE IF NOT EXISTS estate CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE estate;
+
+CREATE TABLE IF NOT EXISTS users (
+ id CHAR(36) PRIMARY KEY, email VARCHAR(190) NOT NULL UNIQUE, password_hash VARCHAR(255) NOT NULL,
+ full_name VARCHAR(190), role ENUM('admin','manager','accountant','msimamizi','user') NOT NULL DEFAULT 'user',
+ otp_code VARCHAR(6), otp_expires_at DATETIME, verified_at DATETIME, reset_token_hash CHAR(64), reset_expires_at DATETIME,
+ created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS auth_tokens (
+ token_hash CHAR(64) PRIMARY KEY, user_id CHAR(36) NOT NULL, expires_at DATETIME NOT NULL,
+ created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, INDEX(user_id), INDEX(expires_at),
+ CONSTRAINT fk_auth_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS properties (
+ id CHAR(36) PRIMARY KEY, name VARCHAR(190) NOT NULL, address TEXT, type VARCHAR(80), unit_count INT NOT NULL DEFAULT 0,
+ description TEXT, created_by CHAR(36), created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS units (
+ id CHAR(36) PRIMARY KEY, property_id CHAR(36) NOT NULL, unit_number VARCHAR(100) NOT NULL, type VARCHAR(80),
+ rent_amount DECIMAL(15,2) NOT NULL DEFAULT 0, status VARCHAR(50) NOT NULL DEFAULT 'Vacant', created_by CHAR(36),
+ created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ INDEX(property_id), INDEX(status)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS tenants (
+ id CHAR(36) PRIMARY KEY, full_name VARCHAR(190) NOT NULL, phone VARCHAR(60) NOT NULL, email VARCHAR(190),
+ unit_id CHAR(36), property_id CHAR(36), lease_start DATE, lease_end DATE, monthly_rent DECIMAL(15,2) NOT NULL DEFAULT 0,
+ balance DECIMAL(15,2) NOT NULL DEFAULT 0, status VARCHAR(50) NOT NULL DEFAULT 'Active', nida_number VARCHAR(100),
+ passport_number VARCHAR(100), tin_number VARCHAR(100), employer VARCHAR(190), employer_phone VARCHAR(60),
+ next_of_kin_name VARCHAR(190), next_of_kin_phone VARCHAR(60), next_of_kin_relation VARCHAR(100), created_by CHAR(36),
+ created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ INDEX(unit_id), INDEX(property_id), INDEX(status)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS payments (
+ id CHAR(36) PRIMARY KEY, tenant_id CHAR(36) NOT NULL, unit_id CHAR(36), amount DECIMAL(15,2) NOT NULL,
+ payment_date DATE NOT NULL, method VARCHAR(80) NOT NULL, period CHAR(7), reference VARCHAR(190),
+ status VARCHAR(50) NOT NULL DEFAULT 'Completed', created_by CHAR(36), created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ INDEX(tenant_id), INDEX(unit_id), INDEX(period), INDEX(status)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS expenses (
+ id CHAR(36) PRIMARY KEY, description TEXT NOT NULL, amount DECIMAL(15,2) NOT NULL, date DATE NOT NULL,
+ category VARCHAR(80) NOT NULL, property_id CHAR(36), vendor VARCHAR(190), payment_method VARCHAR(80), created_by CHAR(36),
+ created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ INDEX(property_id), INDEX(date)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS maintenance_requests (
+ id CHAR(36) PRIMARY KEY, unit_id CHAR(36) NOT NULL, property_id CHAR(36), tenant_id CHAR(36),
+ title VARCHAR(190) NOT NULL, description TEXT, priority VARCHAR(50) NOT NULL DEFAULT 'Medium',
+ status VARCHAR(50) NOT NULL DEFAULT 'Open', assigned_technician VARCHAR(190), cost DECIMAL(15,2) NOT NULL DEFAULT 0,
+ reported_date DATE, resolved_date DATE, created_by CHAR(36), created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ INDEX(unit_id), INDEX(property_id), INDEX(tenant_id), INDEX(status)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS staff (
+ id CHAR(36) PRIMARY KEY, full_name VARCHAR(190) NOT NULL, phone VARCHAR(60) NOT NULL, email VARCHAR(190),
+ role VARCHAR(100), system_role VARCHAR(50), property_id CHAR(36), salary DECIMAL(15,2) NOT NULL DEFAULT 0,
+ status VARCHAR(50) NOT NULL DEFAULT 'Active', start_date DATE, created_by CHAR(36),
+ created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ INDEX(property_id), INDEX(status)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS utilities (
+ id CHAR(36) PRIMARY KEY, property_id CHAR(36), unit_id CHAR(36), utility_type VARCHAR(80) NOT NULL,
+ previous_reading DECIMAL(15,2) NOT NULL DEFAULT 0, current_reading DECIMAL(15,2) NOT NULL DEFAULT 0,
+ consumption DECIMAL(15,2) NOT NULL DEFAULT 0, rate DECIMAL(15,2) NOT NULL DEFAULT 0, amount DECIMAL(15,2) NOT NULL DEFAULT 0,
+ reading_date DATE, period CHAR(7), status VARCHAR(50) NOT NULL DEFAULT 'Unpaid', created_by CHAR(36),
+ created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ INDEX(property_id), INDEX(unit_id), INDEX(period), INDEX(status)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS inventory (
+ id CHAR(36) PRIMARY KEY, property_id CHAR(36) NOT NULL, unit_id CHAR(36), item_name VARCHAR(190) NOT NULL,
+ category VARCHAR(80), quantity DECIMAL(15,2) NOT NULL DEFAULT 1, `condition` VARCHAR(50) NOT NULL DEFAULT 'Good',
+ value DECIMAL(15,2) NOT NULL DEFAULT 0, notes TEXT, created_by CHAR(36), created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, INDEX(property_id), INDEX(unit_id)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS penalties (
+ id CHAR(36) PRIMARY KEY, tenant_id CHAR(36) NOT NULL, amount DECIMAL(15,2) NOT NULL,
+ base_rent DECIMAL(15,2) NOT NULL DEFAULT 0, period CHAR(7) NOT NULL, date_applied DATE,
+ status VARCHAR(50) NOT NULL DEFAULT 'Applied', created_by CHAR(36), created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ INDEX(tenant_id), INDEX(period), INDEX(status)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS leads (
+ id CHAR(36) PRIMARY KEY, full_name VARCHAR(190) NOT NULL, phone VARCHAR(60) NOT NULL, email VARCHAR(190),
+ interested_property_id CHAR(36), preferred_unit_type VARCHAR(80), budget DECIMAL(15,2) NOT NULL DEFAULT 0,
+ source VARCHAR(80), status VARCHAR(50) NOT NULL DEFAULT 'New', notes TEXT, follow_up_date DATE, created_by CHAR(36),
+ created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ INDEX(interested_property_id), INDEX(status), INDEX(follow_up_date)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS rent_reminders (
+ id CHAR(36) PRIMARY KEY, tenant_id CHAR(36) NOT NULL, property_id CHAR(36), amount_due DECIMAL(15,2) NOT NULL DEFAULT 0,
+ period CHAR(7) NOT NULL, reminder_date DATE NOT NULL, message TEXT, status VARCHAR(50) NOT NULL DEFAULT 'Sent',
+ channel VARCHAR(50) NOT NULL DEFAULT 'Portal', created_by CHAR(36), created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY unique_tenant_period(tenant_id,period), INDEX(property_id), INDEX(status)
+) ENGINE=InnoDB;
+CREATE TABLE IF NOT EXISTS settings (
+ id CHAR(36) PRIMARY KEY, company_name VARCHAR(190), contact_person VARCHAR(190), phone VARCHAR(60), email VARCHAR(190),
+ address TEXT, tin_number VARCHAR(100), logo_url TEXT, penalty_rate DECIMAL(8,2) NOT NULL DEFAULT 5,
+ grace_period_days INT NOT NULL DEFAULT 5, late_fee_policy VARCHAR(80), fixed_late_fee DECIMAL(15,2) NOT NULL DEFAULT 0,
+ currency VARCHAR(20) NOT NULL DEFAULT 'TZS', fiscal_year_start VARCHAR(20), bank_name VARCHAR(190),
+ bank_account_name VARCHAR(190), bank_account_number VARCHAR(100), mpesa_paybill VARCHAR(100),
+ airtel_money_number VARCHAR(100), tigopesa_number VARCHAR(100), created_by CHAR(36),
+ created_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
