@@ -10,6 +10,25 @@ export function formatDate(dateStr) {
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+export function calculateBalance(tenant, payments) {
+  if (!tenant?.lease_start || !tenant?.monthly_rent) return 0;
+  const leaseStart = new Date(tenant.lease_start);
+  const now = new Date();
+  const monthsPassed = (now.getFullYear() - leaseStart.getFullYear()) * 12 + (now.getMonth() - leaseStart.getMonth());
+  if (monthsPassed < 0) return 0;
+  const totalOwed = monthsPassed * (tenant.monthly_rent || 0);
+  const totalPaid = (payments || [])
+    .filter((p) => p.tenant_id === tenant.id && p.status === "Completed")
+    .reduce((sum, p) => sum + (p.amount || 0), 0);
+  return totalOwed - totalPaid;
+}
+
+export function balanceColor(balance) {
+  if (balance > 0) return "text-rose-600";
+  if (balance < 0) return "text-emerald-600";
+  return "text-slate-400";
+}
+
 export function statusColor(status) {
   const map = {
     Vacant: "bg-slate-100 text-slate-700",

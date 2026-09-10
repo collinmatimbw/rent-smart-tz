@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { mysql } from "@/api/mysqlClient";
 import { Plus, Wallet, X, Search, Pencil, Trash2, AlertCircle, CheckCircle, CreditCard } from "lucide-react";
-import { formatTsh, statusColor, formatDate } from "@/lib/format";
+import { formatTsh, statusColor, formatDate, calculateBalance, balanceColor } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -72,10 +72,9 @@ export default function Payments() {
       await mysql.entities.Payment.create(payload);
     }
 
-    if (tenant && form.status === "Completed") {
-      const balance = tenant.balance || 0;
-      const newBalance = balance - payload.amount;
-      await mysql.entities.Tenant.update(tenant.id, { balance: newBalance });
+    if (tenant && form.status === "Completed" && !editing) {
+      const currentBal = calculateBalance(tenant, payments);
+      const newBalance = currentBal - payload.amount;
       if (newBalance < 0) {
         setOverpaymentInfo({ tenant: tenant.full_name, amount: Math.abs(newBalance) });
       }
@@ -88,13 +87,6 @@ export default function Payments() {
   async function handleDelete(p) {
     if (!confirm(`Delete this payment of ${formatTsh(p.amount)}?`)) return;
     await mysql.entities.Payment.delete(p.id);
-    if (p.status === "Completed") {
-      const tenant = tenants.find((t) => t.id === p.tenant_id);
-      if (tenant) {
-        const newBalance = (tenant.balance || 0) + p.amount;
-        await mysql.entities.Tenant.update(tenant.id, { balance: newBalance });
-      }
-    }
     loadData();
   }
 
@@ -112,11 +104,11 @@ export default function Payments() {
 
   const balancePreview = useMemo(() => {
     if (!selectedTenant) return null;
-    const currentBalance = selectedTenant.balance || 0;
+    const currentBalance = calculateBalance(selectedTenant, payments);
     const paymentAmount = parseInt(form.amount) || 0;
     const newBalance = currentBalance - paymentAmount;
     return { currentBalance, paymentAmount, newBalance };
-  }, [selectedTenant, form.amount]);
+  }, [selectedTenant, form.amount, payments]);
 
   const filtered = payments.filter((p) =>
     tenantName(p.tenant_id).toLowerCase().includes(search.toLowerCase()) || p.reference?.toLowerCase().includes(search.toLowerCase())
@@ -265,9 +257,14 @@ export default function Payments() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-slate-500 uppercase">Current Balance</span>
-                    <span className={`text-sm font-semibold ${(selectedTenant.balance || 0) > 0 ? "text-rose-600" : (selectedTenant.balance || 0) < 0 ? "text-emerald-600" : "text-slate-500"}`}>
-                      {formatTsh(selectedTenant.balance || 0)}
-                    </span>
+                    {(() => {
+                      const bal = calculateBalance(selectedTenant, payments);
+                      return (
+                        <span className={`text-sm font-semibold ${balanceColor(bal)}`}>
+                          {formatTsh(bal)}
+                        </span>
+                      );
+                    })()}
                   </div>
                   {selectedTenant.lease_end && (
                     <div className="flex items-center justify-between">

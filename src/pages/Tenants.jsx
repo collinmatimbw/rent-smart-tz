@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { mysql } from "@/api/mysqlClient";
 import { Plus, Users, Pencil, Trash2, X, Search, ExternalLink } from "lucide-react";
 import { Link } from "react-router-dom";
-import { formatTsh, statusColor, formatDate } from "@/lib/format";
+import { formatTsh, statusColor, formatDate, calculateBalance, balanceColor } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,12 +12,13 @@ export default function Tenants() {
   const [tenants, setTenants] = useState([]);
   const [units, setUnits] = useState([]);
   const [properties, setProperties] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState({
     full_name: "", phone: "", email: "", unit_id: "", property_id: "",
-    lease_start: "", lease_end: "", monthly_rent: 0, balance: 0, status: "Active",
+    lease_start: "", lease_end: "", monthly_rent: 0, status: "Active",
     nida_number: "", passport_number: "", tin_number: "",
     employer: "", employer_phone: "",
     next_of_kin_name: "", next_of_kin_phone: "", next_of_kin_relation: "",
@@ -29,14 +30,16 @@ export default function Tenants() {
 
   async function loadData() {
     try {
-      const [t, u, p] = await Promise.all([
+      const [t, u, p, pay] = await Promise.all([
         mysql.entities.Tenant.list("-created_date", 500),
         mysql.entities.Unit.list("-created_date", 500),
         mysql.entities.Property.list("-created_date", 500),
+        mysql.entities.Payment.list("-created_date", 1000),
       ]);
       setTenants(t);
       setUnits(u);
       setProperties(p);
+      setPayments(pay);
     } finally {
       setLoading(false);
     }
@@ -44,7 +47,7 @@ export default function Tenants() {
 
   function openCreate() {
     setEditing(null);
-    setForm({ full_name: "", phone: "", email: "", unit_id: "", property_id: "", lease_start: "", lease_end: "", monthly_rent: 0, balance: 0, status: "Active", nida_number: "", passport_number: "", tin_number: "", employer: "", employer_phone: "", next_of_kin_name: "", next_of_kin_phone: "", next_of_kin_relation: "" });
+    setForm({ full_name: "", phone: "", email: "", unit_id: "", property_id: "", lease_start: "", lease_end: "", monthly_rent: 0, status: "Active", nida_number: "", passport_number: "", tin_number: "", employer: "", employer_phone: "", next_of_kin_name: "", next_of_kin_phone: "", next_of_kin_relation: "" });
     setShowForm(true);
   }
 
@@ -54,7 +57,7 @@ export default function Tenants() {
       full_name: tenant.full_name, phone: tenant.phone, email: tenant.email || "",
       unit_id: tenant.unit_id || "", property_id: tenant.property_id || "",
       lease_start: tenant.lease_start || "", lease_end: tenant.lease_end || "",
-      monthly_rent: tenant.monthly_rent || 0, balance: tenant.balance || 0, status: tenant.status,
+      monthly_rent: tenant.monthly_rent || 0, status: tenant.status,
       nida_number: tenant.nida_number || "", passport_number: tenant.passport_number || "",
       tin_number: tenant.tin_number || "", employer: tenant.employer || "",
       employer_phone: tenant.employer_phone || "",
@@ -170,7 +173,14 @@ export default function Tenants() {
                     <td className="px-4 py-3 text-slate-600">{unitLabel(t.unit_id)}</td>
                     <td className="px-4 py-3 text-right text-slate-900">{formatTsh(t.monthly_rent)}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={t.balance > 0 ? "font-medium text-rose-600" : "text-slate-400"}>{formatTsh(t.balance)}</span>
+                      {(() => {
+                        const bal = calculateBalance(t, payments);
+                        return (
+                          <span className={`font-medium ${balanceColor(bal)}`}>
+                            {formatTsh(bal)}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor(t.status)}`}>{t.status}</span>
@@ -251,14 +261,10 @@ export default function Tenants() {
                   <Input type="date" value={form.lease_end} onChange={(e) => setForm({ ...form, lease_end: e.target.value })} className="mt-1" />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Monthly Rent</Label>
                   <Input type="number" value={form.monthly_rent} onChange={(e) => setForm({ ...form, monthly_rent: parseInt(e.target.value) || 0 })} className="mt-1" />
-                </div>
-                <div>
-                  <Label>Balance</Label>
-                  <Input type="number" value={form.balance} onChange={(e) => setForm({ ...form, balance: parseInt(e.target.value) || 0 })} className="mt-1" />
                 </div>
                 <div>
                   <Label>Status</Label>
