@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { mysql } from "@/api/mysqlClient";
-import { Plus, Wallet, X, Search, Pencil, Trash2, AlertCircle } from "lucide-react";
+import { Plus, Wallet, X, Search, Pencil, Trash2, AlertCircle, CheckCircle, CreditCard } from "lucide-react";
 import { formatTsh, statusColor, formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,9 +20,7 @@ export default function Payments() {
     method: "M-Pesa", period: "", reference: "", status: "Completed",
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   async function loadData() {
     try {
@@ -51,14 +49,9 @@ export default function Payments() {
   function openEdit(p) {
     setEditing(p);
     setForm({
-      tenant_id: p.tenant_id,
-      unit_id: p.unit_id || "",
-      amount: p.amount,
-      payment_date: p.payment_date,
-      method: p.method,
-      period: p.period || "",
-      reference: p.reference || "",
-      status: p.status,
+      tenant_id: p.tenant_id, unit_id: p.unit_id || "", amount: p.amount,
+      payment_date: p.payment_date, method: p.method, period: p.period || "",
+      reference: p.reference || "", status: p.status,
     });
     setOverpaymentInfo(null);
     setShowForm(true);
@@ -115,6 +108,16 @@ export default function Payments() {
     return u ? u.unit_number : "—";
   }
 
+  const selectedTenant = useMemo(() => tenants.find((t) => t.id === form.tenant_id), [tenants, form.tenant_id]);
+
+  const balancePreview = useMemo(() => {
+    if (!selectedTenant) return null;
+    const currentBalance = selectedTenant.balance || 0;
+    const paymentAmount = parseInt(form.amount) || 0;
+    const newBalance = currentBalance - paymentAmount;
+    return { currentBalance, paymentAmount, newBalance };
+  }, [selectedTenant, form.amount]);
+
   const filtered = payments.filter((p) =>
     tenantName(p.tenant_id).toLowerCase().includes(search.toLowerCase()) || p.reference?.toLowerCase().includes(search.toLowerCase())
   );
@@ -142,15 +145,15 @@ export default function Payments() {
       </div>
 
       {overpaymentInfo && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
+          <CheckCircle className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
           <div>
-            <p className="text-sm font-medium text-blue-900">Overpayment recorded</p>
-            <p className="text-sm text-blue-700">
+            <p className="text-sm font-medium text-emerald-900">Overpayment recorded</p>
+            <p className="text-sm text-emerald-700">
               {overpaymentInfo.tenant} overpaid by {formatTsh(overpaymentInfo.amount)}. This amount covers next month's rent.
             </p>
           </div>
-          <button onClick={() => setOverpaymentInfo(null)} className="ml-auto text-blue-400 hover:text-blue-600">
+          <button onClick={() => setOverpaymentInfo(null)} className="ml-auto text-emerald-400 hover:text-emerald-600">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -234,7 +237,7 @@ export default function Payments() {
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowForm(false)} />
-          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-heading font-semibold text-lg text-slate-900">{editing ? "Edit Payment" : "Record Payment"}</h2>
               <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-slate-100">
@@ -246,12 +249,35 @@ export default function Payments() {
                 <Label>Tenant *</Label>
                 <select value={form.tenant_id} onChange={(e) => {
                   const t = tenants.find((x) => x.id === e.target.value);
-                  setForm({ ...form, tenant_id: e.target.value, amount: t?.monthly_rent || form.amount, unit_id: t?.unit_id || "" });
+                  setForm({ ...form, tenant_id: e.target.value, amount: t?.monthly_rent || 0, unit_id: t?.unit_id || "" });
                 }} required className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                   <option value="">Select tenant</option>
                   {tenants.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
                 </select>
               </div>
+
+              {/* Tenant Info Card */}
+              {selectedTenant && (
+                <div className="bg-slate-50 rounded-lg border border-slate-200 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500 uppercase">Monthly Rent</span>
+                    <span className="text-sm font-semibold text-slate-900">{formatTsh(selectedTenant.monthly_rent)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-slate-500 uppercase">Current Balance</span>
+                    <span className={`text-sm font-semibold ${(selectedTenant.balance || 0) > 0 ? "text-rose-600" : (selectedTenant.balance || 0) < 0 ? "text-emerald-600" : "text-slate-500"}`}>
+                      {formatTsh(selectedTenant.balance || 0)}
+                    </span>
+                  </div>
+                  {selectedTenant.lease_end && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-slate-500 uppercase">Lease End</span>
+                      <span className="text-sm text-slate-700">{formatDate(selectedTenant.lease_end)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Amount (Tsh) *</Label>
@@ -260,14 +286,59 @@ export default function Payments() {
                 <div>
                   <Label>Method</Label>
                   <select value={form.method} onChange={(e) => setForm({ ...form, method: e.target.value })} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    <option>M-Pesa</option>
-                    <option>Tigo Pesa</option>
-                    <option>Airtel Money</option>
-                    <option>Cash</option>
-                    <option>Bank Transfer</option>
+                    <option>M-Pesa</option><option>Tigo Pesa</option><option>Airtel Money</option><option>Cash</option><option>Bank Transfer</option>
                   </select>
                 </div>
               </div>
+
+              {/* Live Balance Preview */}
+              {balancePreview && (
+                <div className={`rounded-lg border p-3 ${
+                  balancePreview.newBalance > 0
+                    ? "bg-rose-50 border-rose-200"
+                    : balancePreview.newBalance < 0
+                      ? "bg-emerald-50 border-emerald-200"
+                      : "bg-slate-50 border-slate-200"
+                }`}>
+                  <div className="flex items-center gap-2">
+                    <CreditCard className={`w-4 h-4 ${
+                      balancePreview.newBalance > 0
+                        ? "text-rose-500"
+                        : balancePreview.newBalance < 0
+                          ? "text-emerald-500"
+                          : "text-slate-400"
+                    }`} />
+                    <span className="text-sm font-medium text-slate-700">Balance Preview</span>
+                  </div>
+                  <div className="mt-2 space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Current balance:</span>
+                      <span className="font-medium text-slate-700">{formatTsh(balancePreview.currentBalance)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Payment:</span>
+                      <span className="font-medium text-slate-700">-{formatTsh(balancePreview.paymentAmount)}</span>
+                    </div>
+                    <div className="border-t border-slate-200 pt-1 flex justify-between">
+                      <span className="text-slate-500 font-medium">New balance:</span>
+                      <span className={`font-bold ${
+                        balancePreview.newBalance > 0
+                          ? "text-rose-600"
+                          : balancePreview.newBalance < 0
+                            ? "text-emerald-600"
+                            : "text-slate-500"
+                      }`}>
+                        {balancePreview.newBalance > 0
+                          ? `Remaining: ${formatTsh(balancePreview.newBalance)}`
+                          : balancePreview.newBalance < 0
+                            ? `Overpaid: ${formatTsh(Math.abs(balancePreview.newBalance))}`
+                            : "Paid in full (0 Tsh)"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Payment Date *</Label>
@@ -286,9 +357,7 @@ export default function Payments() {
                 <div>
                   <Label>Status</Label>
                   <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                    <option>Completed</option>
-                    <option>Pending</option>
-                    <option>Failed</option>
+                    <option>Completed</option><option>Pending</option><option>Failed</option>
                   </select>
                 </div>
               </div>

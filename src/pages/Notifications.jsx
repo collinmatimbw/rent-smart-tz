@@ -5,7 +5,7 @@ import { formatTsh, formatDate } from "@/lib/format";
 import StatCard from "@/components/StatCard";
 import {
   AlertTriangle, CalendarClock, Phone, Zap, Wrench, Users, RefreshCw, ArrowRight,
-  TrendingDown, Bell,
+  TrendingDown, Bell, Clock,
 } from "lucide-react";
 
 export default function Notifications() {
@@ -19,6 +19,7 @@ export default function Notifications() {
   const [vacantUnits, setVacantUnits] = useState([]);
   const [highlight, setHighlight] = useState(null);
   const [rentReminders, setRentReminders] = useState([]);
+  const [paymentDueSoon, setPaymentDueSoon] = useState([]);
   const [generating, setGenerating] = useState(false);
   const loadingRef = useRef(false);
 
@@ -78,6 +79,28 @@ export default function Notifications() {
       );
       setVacantUnits(units.filter((u) => u.status === "Vacant"));
       setRentReminders(reminders);
+
+      // Calculate payment due soon (based on lease_start day of month)
+      const todayDate = new Date();
+      const currentDay = todayDate.getDate();
+      const dueSoon = [];
+      for (const t of tenants) {
+        if (!t.lease_start) continue;
+        const leaseDay = new Date(t.lease_start).getDate();
+        let daysUntilDue = leaseDay - currentDay;
+        if (daysUntilDue < 0) {
+          const nextMonth = new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, leaseDay);
+          daysUntilDue = Math.ceil((nextMonth - todayDate) / (1000 * 60 * 60 * 24));
+        }
+        if (daysUntilDue >= 0 && daysUntilDue <= 7) {
+          const hasPaid = payments.some((p) => p.tenant_id === t.id && p.status === "Completed");
+          if (!hasPaid) {
+            dueSoon.push({ ...t, daysUntilDue, dueDate: leaseDay });
+          }
+        }
+      }
+      setPaymentDueSoon(dueSoon);
+
       setLastUpdated(new Date());
     } finally {
       loadingRef.current = false;
@@ -113,6 +136,7 @@ export default function Notifications() {
 
   const totalAlerts =
     overdueTenants.length +
+    paymentDueSoon.length +
     expiringLeases.length +
     leadFollowUps.length +
     unpaidUtilities.length +
@@ -167,11 +191,11 @@ export default function Notifications() {
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard label="Overdue Rent" value={overdueTenants.length} sub={formatTsh(totalOverdueAmount)} icon={AlertTriangle} color="text-rose-600" bg="bg-rose-50" onClick={() => scrollToSection("alert-overdue")} />
+        <StatCard label="Payment Due Soon" value={paymentDueSoon.length} sub="Within 7 days" icon={Clock} color="text-orange-600" bg="bg-orange-50" onClick={() => scrollToSection("alert-due-soon")} />
         <StatCard label="Expiring Leases" value={expiringLeases.length} sub="Next 30 days" icon={CalendarClock} color="text-orange-600" bg="bg-orange-50" onClick={() => scrollToSection("alert-expiring")} />
         <StatCard label="Lead Follow-ups" value={leadFollowUps.length} sub="Due soon" icon={Phone} color="text-blue-600" bg="bg-blue-50" onClick={() => scrollToSection("alert-leads")} />
         <StatCard label="Unpaid Utilities" value={unpaidUtilities.length} sub={formatTsh(totalUnpaidUtilities)} icon={Zap} color="text-amber-600" bg="bg-amber-50" onClick={() => scrollToSection("alert-utilities")} />
         <StatCard label="Urgent Repairs" value={urgentMaintenance.length} sub="High priority" icon={Wrench} color="text-red-600" bg="bg-red-50" onClick={() => scrollToSection("alert-maintenance")} />
-        <StatCard label="Vacant Units" value={vacantUnits.length} sub="Available" icon={TrendingDown} color="text-slate-600" bg="bg-slate-50" onClick={() => scrollToSection("alert-vacant")} />
       </div>
 
       {/* Alert sections */}
@@ -190,7 +214,24 @@ export default function Notifications() {
             secondary: `${t.phone || "No phone"} · ${formatTsh(t.monthly_rent)} rent`,
             badge: `${formatTsh(t.monthly_rent)} unpaid`,
           }))}
-          emptyText="All tenants have paid this month ðŸŽ‰"
+          emptyText="All tenants have paid this month"
+        />
+
+        {/* Payment Due Soon */}
+        <AlertSection
+          id="alert-due-soon"
+          highlight={highlight === "alert-due-soon"}
+          title="Payment Due Soon (7 days)"
+          icon={Clock}
+          color="amber"
+          link="/payments"
+          items={paymentDueSoon.map((t) => ({
+            id: t.id,
+            primary: t.full_name,
+            secondary: `${t.phone || "No phone"} · ${formatTsh(t.monthly_rent)} rent`,
+            badge: t.daysUntilDue === 0 ? "Due today" : `Due in ${t.daysUntilDue} day${t.daysUntilDue > 1 ? "s" : ""}`,
+          }))}
+          emptyText="No payments due within 7 days"
         />
 
         {/* Expiring Leases */}
